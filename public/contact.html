@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us | CatStore</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen">
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <div class="bg-blue-600 p-2 rounded-lg">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                            </path>
+                        </svg>
+                    </div>
+                    <span class="text-xl font-extrabold text-slate-900 tracking-tight">CatStore</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="index.html"
+                        class="text-slate-500 hover:text-slate-900 font-medium transition-colors">Home</a>
+                    <a href="about.html"
+                        class="text-slate-500 hover:text-slate-900 font-medium transition-colors">About</a>
+                    <a href="contact.html"
+                        class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Contact</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-2xl mx-auto px-4 py-20">
+        <div class="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100">
+            <h1 class="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight text-center">Get in Touch</h1>
+            <p class="text-slate-500 text-center mb-10 font-medium">Have questions or want to submit a new feline breed?
+                Use the form below.</p>
+
+            <form onsubmit="event.preventDefault(); alert('Message sent successfully!');" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Your
+                        Name</label>
+                    <input type="text"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                        placeholder="Alex Johnson">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Email
+                        Address</label>
+                    <input type="email"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
+                        placeholder="alex@gmail.com">
+                </div>
+                <div>
+                    <label
+                        class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Message</label>
+                    <textarea
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium h-32 resize-none"
+                        placeholder="Write your message here..."></textarea>
+                </div>
+                <button type="submit"
+                    class="w-full py-5 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 transition-all shadow-lg active:scale-95 text-lg">Send
+                    Message</button>
+            </form>
+        </div>
+    </main>
+</body>
+
+</html>
