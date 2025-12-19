@@ -5,10 +5,46 @@ const prevBtn = document.getElementById('prev-page');
 const nextBtn = document.getElementById('next-page');
 const pageNumbersContainer = document.getElementById('page-numbers');
 
+// Auth elements
+const loginNavBtn = document.getElementById('login-nav-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const userInfo = document.getElementById('user-info');
+const usernameDisplay = document.getElementById('username-display');
+const authModal = document.getElementById('auth-modal');
+const loginFormContainer = document.getElementById('login-form-container');
+const signupFormContainer = document.getElementById('signup-form-container');
+const addBtn = document.getElementById('add-btn');
+
 let globalCats = [];
 let filteredCats = [];
 let currentPage = 1;
 const itemsPerPage = 9;
+let isAuthenticated = false;
+
+async function checkAuthStatus() {
+    try {
+        const response = await fetch('/check-auth');
+        const data = await response.json();
+        isAuthenticated = data.authenticated;
+        updateAuthUI(data.username);
+    } catch (error) {
+        console.error('Auth check failed:', error);
+    }
+}
+
+function updateAuthUI(username) {
+    if (isAuthenticated) {
+        loginNavBtn.classList.add('hidden');
+        userInfo.classList.remove('hidden');
+        usernameDisplay.textContent = username;
+        addBtn.classList.remove('hidden');
+    } else {
+        loginNavBtn.classList.remove('hidden');
+        userInfo.classList.add('hidden');
+        addBtn.classList.add('hidden');
+    }
+    renderGallery(); // Re-render to show/hide edit/delete buttons
+}
 
 async function fetchCats() {
     try {
@@ -26,10 +62,7 @@ async function fetchCats() {
 function populateTagFilter() {
     const tags = new Set();
     globalCats.forEach(cat => { if(cat.tag) tags.add(cat.tag); });
-    
-    // Clear existing except first
     tagFilter.innerHTML = '<option value="all">All Tags</option>';
-    
     [...tags].sort().forEach(tag => {
         const option = document.createElement('option');
         option.value = tag;
@@ -41,21 +74,18 @@ function populateTagFilter() {
 function applyFilters() {
     const searchTerm = searchInput.value.toLowerCase().trim();
     const activeTag = tagFilter.value;
-
     filteredCats = globalCats.filter(cat => {
         const matchesSearch = (cat.tag && cat.tag.toLowerCase().includes(searchTerm)) ||
                             (cat.description && cat.description.toLowerCase().includes(searchTerm));
         const matchesTag = activeTag === 'all' || cat.tag === activeTag;
         return matchesSearch && matchesTag;
     });
-
     currentPage = 1;
     renderGallery();
 }
 
 function renderGallery() {
     container.innerHTML = '';
-    
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pagedCats = filteredCats.slice(startIndex, endIndex);
@@ -72,113 +102,139 @@ function renderGallery() {
 
         const imgWrapper = document.createElement('div');
         imgWrapper.className = 'relative h-72 overflow-hidden';
-
         const img = document.createElement('img');
         img.className = 'w-full h-full object-cover transition-transform duration-700 group-hover:scale-110';
         img.src = cat.img;
         img.alt = cat.tag || 'Cat';
-
         imgWrapper.appendChild(img);
         
         const content = document.createElement('div');
         content.className = 'p-8 flex flex-col h-[calc(100%-18rem)]';
-
         const title = document.createElement('h2');
         title.className = 'text-2xl font-black text-slate-900 mb-3 capitalize tracking-tight';
         title.innerText = cat.tag || 'Unknown Cat';
-
         const description = document.createElement('p');
         description.className = 'text-slate-500 text-sm leading-relaxed mb-8 line-clamp-3 font-medium';
         description.innerText = cat.description || 'Information pending for this magnificent feline.';
 
-        const actions = document.createElement('div');
-        actions.className = 'flex gap-3 mt-auto';
+        content.append(title, description);
 
-        const editBtn = document.createElement('button');
-        editBtn.className = 'flex-grow inline-flex items-center justify-center px-4 py-3 bg-slate-50 text-slate-900 text-sm font-black rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-sm';
-        editBtn.innerHTML = `
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-            Edit
-        `;
-        editBtn.onclick = () => openEditModal(cat);
+        if (isAuthenticated) {
+            const actions = document.createElement('div');
+            actions.className = 'flex gap-3 mt-auto';
+            const editBtn = document.createElement('button');
+            editBtn.className = 'flex-grow inline-flex items-center justify-center px-4 py-3 bg-slate-50 text-slate-900 text-sm font-black rounded-2xl hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-sm';
+            editBtn.innerHTML = `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Edit`;
+            editBtn.onclick = () => openEditModal(cat);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'inline-flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 text-sm font-black rounded-2xl hover:bg-red-600 hover:text-white transition-all duration-300 shadow-sm';
+            deleteBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v2m3 4h.01"></path></svg>`;
+            deleteBtn.onclick = () => openDeleteModal(cat);
+            actions.append(editBtn, deleteBtn);
+            content.append(actions);
+        }
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'inline-flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 text-sm font-black rounded-2xl hover:bg-red-600 hover:text-white transition-all duration-300 shadow-sm';
-        deleteBtn.innerHTML = `
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v2m3 4h.01"></path></svg>
-        `;
-        deleteBtn.onclick = () => openDeleteModal(cat);
-
-        actions.append(editBtn, deleteBtn);
-        content.append(title, description, actions);
         card.append(imgWrapper, content);
         container.appendChild(card);
     });
-
     updatePagination();
 }
 
 function updatePagination() {
     const totalPages = Math.ceil(filteredCats.length / itemsPerPage);
-    
-    // Previous Button
     prevBtn.disabled = currentPage === 1;
-    
-    // Next Button
     nextBtn.disabled = currentPage === totalPages || totalPages === 0;
-
-    // Page Numbers
     pageNumbersContainer.innerHTML = '';
     for (let i = 1; i <= totalPages; i++) {
         const pageBtn = document.createElement('button');
         pageBtn.innerText = i;
-        pageBtn.className = `w-12 h-12 flex items-center justify-center rounded-xl font-bold transition-all shadow-sm ${
-            i === currentPage 
-            ? 'bg-blue-600 text-white' 
-            : 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-50'
-        }`;
-        pageBtn.onclick = () => {
-            currentPage = i;
-            renderGallery();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        };
+        pageBtn.className = `w-12 h-12 flex items-center justify-center rounded-xl font-bold transition-all shadow-sm ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-50'}`;
+        pageBtn.onclick = () => { currentPage = i; renderGallery(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
         pageNumbersContainer.appendChild(pageBtn);
     }
 }
 
 // ==========================================
-// EVENT LISTENERS
+// AUTH LOGIC
 // ==========================================
-searchInput.addEventListener('input', applyFilters);
-tagFilter.addEventListener('change', applyFilters);
-
-prevBtn.onclick = () => {
-    if (currentPage > 1) {
-        currentPage--;
-        renderGallery();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+loginNavBtn.onclick = () => {
+    authModal.classList.remove('hidden');
+    loginFormContainer.classList.remove('hidden');
+    signupFormContainer.classList.add('hidden');
+    toggleBodyScroll(true);
 };
 
-nextBtn.onclick = () => {
-    const totalPages = Math.ceil(filteredCats.length / itemsPerPage);
-    if (currentPage < totalPages) {
-        currentPage++;
-        renderGallery();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+document.getElementById('switch-to-signup').onclick = () => {
+    loginFormContainer.classList.add('hidden');
+    signupFormContainer.classList.remove('hidden');
+};
+
+document.getElementById('switch-to-login').onclick = () => {
+    signupFormContainer.classList.add('hidden');
+    loginFormContainer.classList.remove('hidden');
+};
+
+const closeAuthModal = () => {
+    authModal.classList.add('hidden');
+    toggleBodyScroll(false);
+};
+
+document.getElementById('auth-cancel-btn').onclick = closeAuthModal;
+document.getElementById('auth-signup-cancel-btn').onclick = closeAuthModal;
+
+document.getElementById('login-submit-btn').onclick = async () => {
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    try {
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            isAuthenticated = true;
+            updateAuthUI(data.username);
+            closeAuthModal();
+        } else {
+            console.log(data.error);
+        }
+    } catch (err) { console.error(err); }
+};
+
+document.getElementById('signup-submit-btn').onclick = async () => {
+    const username = document.getElementById('signup-username').value;
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    try {
+        const res = await fetch('/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            console.log('Signup successful! Please log in.');
+            document.getElementById('switch-to-login').click();
+        } else {
+            console.log(data.error);
+        }
+    } catch (err) { console.error(err); }
+};
+
+logoutBtn.onclick = async () => {
+    try {
+        await fetch('/logout', { method: 'POST' });
+        isAuthenticated = false;
+        updateAuthUI();
+    } catch (err) { console.error(err); }
 };
 
 // ==========================================
-// MODAL LOGIC
+// CAT MODALS
 // ==========================================
-const toggleBodyScroll = (disable) => {
-    document.body.style.overflow = disable ? 'hidden' : '';
-};
-
+const toggleBodyScroll = (disable) => { document.body.style.overflow = disable ? 'hidden' : ''; };
 const editModal = document.getElementById('edit-modal');
-const saveBtn = document.getElementById('save-btn');
-const cancelBtn = document.getElementById('cancel-btn');
 
 function openEditModal(cat) {
     document.getElementById('edit-id').value = cat.id;
@@ -189,106 +245,73 @@ function openEditModal(cat) {
     toggleBodyScroll(true);
 }
 
-function closeEditModal() {
-    editModal.classList.add('hidden');
-    toggleBodyScroll(false);
-}
+document.getElementById('cancel-btn').onclick = () => { editModal.classList.add('hidden'); toggleBodyScroll(false); };
 
-cancelBtn.onclick = closeEditModal;
-
-saveBtn.onclick = async () => {
+document.getElementById('save-btn').onclick = async () => {
     const id = document.getElementById('edit-id').value;
     const tag = document.getElementById('edit-tag').value;
     const img = document.getElementById('edit-img').value;
     const description = document.getElementById('edit-description').value;
-
     try {
-        const response = await fetch(`/cats/${id}`, {
+        const res = await fetch(`/cats/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tag, img, description })
         });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        closeEditModal();
-        fetchCats();
-    } catch (error) {
-        console.error('Error updating cat:', error);
-    }
+        if (res.ok) { editModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
+        else if (res.status === 401) console.log('Session expired. Please log in.');
+    } catch (error) { console.error(error); }
 };
 
 const addModal = document.getElementById('add-modal');
-const addBtn = document.getElementById('add-btn');
-const addSaveBtn = document.getElementById('add-save-btn');
-const addCancelBtn = document.getElementById('add-cancel-btn');
-
-function openAddModal() {
+addBtn.onclick = () => {
     document.getElementById('add-tag').value = '';
     document.getElementById('add-img').value = '';
     document.getElementById('add-description').value = '';
     addModal.classList.remove('hidden');
     toggleBodyScroll(true);
-}
+};
 
-function closeAddModal() {
-    addModal.classList.add('hidden');
-    toggleBodyScroll(false);
-}
+document.getElementById('add-cancel-btn').onclick = () => { addModal.classList.add('hidden'); toggleBodyScroll(false); };
 
-addBtn.onclick = openAddModal;
-addCancelBtn.onclick = closeAddModal;
-
-addSaveBtn.onclick = async () => {
+document.getElementById('add-save-btn').onclick = async () => {
+    const id = Date.now().toString();
     const tag = document.getElementById('add-tag').value;
     const img = document.getElementById('add-img').value;
     const description = document.getElementById('add-description').value;
-    const id = Date.now().toString();
-
     try {
-        const response = await fetch('/cats', {
+        const res = await fetch('/cats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, tag, img, description })
         });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        closeAddModal();
-        fetchCats(); 
-    } catch (error) {
-        console.error('Error adding cat:', error);
-    }
+        if (res.ok) { addModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
+        else if (res.status === 401) console.log('Session expired. Please log in.');
+    } catch (error) { console.error(error); }
 };
 
 const deleteModal = document.getElementById('delete-modal');
-const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
-
 function openDeleteModal(cat) {
     document.getElementById('delete-id').value = cat.id;
     deleteModal.classList.remove('hidden');
     toggleBodyScroll(true);
 }
 
-function closeDeleteModal() {
-    deleteModal.classList.add('hidden');
-    toggleBodyScroll(false);
-}
+document.getElementById('cancel-delete-btn').onclick = () => { deleteModal.classList.add('hidden'); toggleBodyScroll(false); };
 
-cancelDeleteBtn.onclick = closeDeleteModal;
-
-confirmDeleteBtn.onclick = async () => {
+document.getElementById('confirm-delete-btn').onclick = async () => {
     const id = document.getElementById('delete-id').value;
-
     try {
-        const response = await fetch(`/cats/${id}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        closeDeleteModal();
-        fetchCats(); 
-    } catch (error) {
-        console.error('Error deleting cat:', error);
-    }
+        const res = await fetch(`/cats/${id}`, { method: 'DELETE' });
+        if (res.ok) { deleteModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
+        else if (res.status === 401) console.log('Session expired. Please log in.');
+    } catch (error) { console.error(error); }
 };
 
-fetchCats();
+// INIT
+searchInput.addEventListener('input', applyFilters);
+tagFilter.addEventListener('change', applyFilters);
+prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; renderGallery(); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
+nextBtn.onclick = () => { const totalPages = Math.ceil(filteredCats.length / itemsPerPage); if (currentPage < totalPages) { currentPage++; renderGallery(); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
+
+checkAuthStatus().then(fetchCats);
