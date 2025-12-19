@@ -24,6 +24,7 @@ const db = mysql.createConnection({
   database: "animals_db"
 });
 
+
 db.connect((err) => {
   if (err) {
     console.error("Error connecting to MySQL:", err.message);
