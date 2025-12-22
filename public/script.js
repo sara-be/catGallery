@@ -14,6 +14,11 @@ const authModal = document.getElementById('auth-modal');
 const loginFormContainer = document.getElementById('login-form-container');
 const signupFormContainer = document.getElementById('signup-form-container');
 const addBtn = document.getElementById('add-btn');
+const viewAdoptedBtn = document.getElementById('view-adopted-btn');
+const adoptedModal = document.getElementById('adopted-modal');
+const closeAdoptedBtn = document.getElementById('close-adopted-btn');
+const adoptedCatsContainer = document.getElementById('adopted-cats-container');
+const noAdoptionsMsg = document.getElementById('no-adoptions-msg');
 
 let globalCats = [];
 let filteredCats = [];
@@ -38,10 +43,12 @@ function updateAuthUI(username) {
         userInfo.classList.remove('hidden');
         usernameDisplay.textContent = username;
         addBtn.classList.remove('hidden');
+        viewAdoptedBtn.classList.remove('hidden');
     } else {
         loginNavBtn.classList.remove('hidden');
         userInfo.classList.add('hidden');
         addBtn.classList.add('hidden');
+        viewAdoptedBtn.classList.add('hidden');
     }
     renderGallery(); // Re-render to show/hide edit/delete buttons
 }
@@ -130,8 +137,17 @@ function renderGallery() {
             deleteBtn.className = 'inline-flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 text-sm font-black rounded-2xl hover:bg-red-600 hover:text-white transition-all duration-300 shadow-sm';
             deleteBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v2m3 4h.01"></path></svg>`;
             deleteBtn.onclick = () => openDeleteModal(cat);
+            
+            const adoptBtn = document.createElement('button');
+            adoptBtn.className = 'flex-grow inline-flex items-center justify-center px-4 py-3 bg-green-600 text-white text-sm font-black rounded-2xl hover:bg-green-700 transition-all duration-300 shadow-md transform active:scale-95';
+            adoptBtn.innerHTML = `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>Adopt`;
+            adoptBtn.onclick = () => adoptCat(cat.id);
+
             actions.append(editBtn, deleteBtn);
-            content.append(actions);
+            const actionContainer = document.createElement('div');
+            actionContainer.className = 'flex flex-col gap-3 mt-auto';
+            actionContainer.append(actions, adoptBtn);
+            content.append(actionContainer);
         }
 
         card.append(imgWrapper, content);
@@ -306,6 +322,64 @@ document.getElementById('confirm-delete-btn').onclick = async () => {
         if (res.ok) { deleteModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
         else if (res.status === 401) console.log('Session expired. Please log in.');
     } catch (error) { console.error(error); }
+};
+
+// ==========================================
+// ADOPTION LOGIC
+// ==========================================
+async function adoptCat(catId) {
+    try {
+        const res = await fetch('/adopt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ catId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Congratulations! You have adopted a new feline friend!');
+        } else {
+            alert(data.error || 'Adoption failed');
+        }
+    } catch (error) {
+        console.error('Adoption error:', error);
+    }
+}
+
+viewAdoptedBtn.onclick = async () => {
+    try {
+        const res = await fetch('/adopted');
+        const adoptedCats = await res.json();
+        
+        adoptedCatsContainer.innerHTML = '';
+        if (adoptedCats.length === 0) {
+            noAdoptionsMsg.classList.remove('hidden');
+        } else {
+            noAdoptionsMsg.classList.add('hidden');
+            adoptedCats.forEach(cat => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col gap-3';
+                card.innerHTML = `
+                    <div class="h-40 overflow-hidden rounded-xl">
+                        <img src="${cat.img}" class="w-full h-full object-cover shadow-sm">
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900 capitalize">${cat.tag}</h4>
+                        <p class="text-xs text-slate-500">Adopted on: ${new Date(cat.adoptionDate).toLocaleDateString()}</p>
+                    </div>
+                `;
+                adoptedCatsContainer.appendChild(card);
+            });
+        }
+        adoptedModal.classList.remove('hidden');
+        toggleBodyScroll(true);
+    } catch (error) {
+        console.error('Fetch adopted cats error:', error);
+    }
+};
+
+closeAdoptedBtn.onclick = () => {
+    adoptedModal.classList.add('hidden');
+    toggleBodyScroll(false);
 };
 
 // INIT

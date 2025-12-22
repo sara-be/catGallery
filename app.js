@@ -16,22 +16,37 @@ app.use(session({
   cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }));
 
-// Database connection
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "animals_db"
-});
+// Database connection with reconnection logic
+let db;
+function handleDisconnect() {
+  db = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "",
+    database: "animals_db"
+  });
 
+  db.connect((err) => {
+    if (err) {
+      console.error("Error connecting to MySQL:", err.message);
+      setTimeout(handleDisconnect, 2000); // Reconnect after 2 seconds
+      return;
+    }
+    console.log("MySQL connected!");
+    setupTables();
+  });
 
-db.connect((err) => {
-  if (err) {
-    console.error("Error connecting to MySQL:", err.message);
-    return;
-  }
-  console.log("MySQL connected!");
-  
+  db.on('error', (err) => {
+    console.error("Database error:", err.message);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR') {
+      handleDisconnect();
+    } else {
+      throw err;
+    }
+  });
+}
+
+function setupTables() {
   // Create users table if not exists
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
@@ -45,7 +60,55 @@ db.connect((err) => {
     if (err) console.error("Error creating users table:", err);
     else console.log("Users table ready");
   });
-});
+
+  // Create cat table if not exists
+  const createCatTable = `
+    CREATE TABLE IF NOT EXISTS cat (
+      id VARCHAR(255) PRIMARY KEY,
+      tag VARCHAR(255),
+      img TEXT,
+      description TEXT
+    )
+  `;
+  db.query(createCatTable, (err) => {
+    if (err) console.error("Error creating cat table:", err);
+    else {
+      console.log("Cat table ready");
+      // Seed data if empty
+      db.query("SELECT COUNT(*) as count FROM cat", (err, results) => {
+        if (!err && results[0] && results[0].count === 0) {
+          const seedSql = "INSERT INTO cat (id, tag, img, description) VALUES ?";
+          const values = [
+            ['1', 'Siamese', 'https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=800', 'Elegant and vocal, Siamese cats are known for their striking blue eyes and point coloration.'],
+            ['2', 'Bengal', 'https://images.unsplash.com/photo-1513360371669-4adaa10f762b?auto=format&fit=crop&q=80&w=800', 'Wild-looking with their spotted coats, Bengals are active, playful, and intelligent.'],
+            ['3', 'Persian', 'https://images.unsplash.com/photo-1557008075-7f2c5efa4cfd?auto=format&fit=crop&q=80&w=800', 'Known for their long, luxurious fur and sweet personalities, Persians are the royalty of the cat world.']
+          ];
+          db.query(seedSql, [values], (err) => {
+            if (err) console.error("Error seeding cat data:", err);
+            else console.log("Cat table seeded with sample data");
+          });
+        }
+      });
+    }
+  });
+
+  // Create adopted table if not exists
+  const createAdoptedTable = `
+    CREATE TABLE IF NOT EXISTS adopted (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      catId VARCHAR(255) NOT NULL,
+      userId INT NOT NULL,
+      adoptionDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id)
+    )
+  `;
+  db.query(createAdoptedTable, (err) => {
+    if (err) console.error("Error creating adopted table:", err);
+    else console.log("Adopted table ready");
+  });
+}
+
+handleDisconnect();
 
 // ==========================================
 // AUTH MIDDLEWARE
@@ -73,7 +136,7 @@ app.post("/signup", async (req, res) => {
         if (err.code === 'ER_DUP_ENTRY') {
           return res.status(400).json({ error: "Username or email already exists" });
         }
-        return res.status(500).json({ error: err });
+        return res.status(500).json({ error: err.message });
       }
       res.json({ message: "User created successfully" });
     });
@@ -87,7 +150,7 @@ app.post("/login", (req, res) => {
   
   const sql = "SELECT * FROM users WHERE username = ?";
   db.query(sql, [username], async (err, results) => {
-    if (err) return res.status(500).json({ error: err });
+    if (err) return res.status(500).json({ error: err.message });
     if (results.length === 0) return res.status(401).json({ error: "Invalid username or password" });
     
     const user = results[0];
@@ -106,6 +169,7 @@ app.post("/login", (req, res) => {
 app.post("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) return res.status(500).json({ error: "Logout failed" });
+    res.clearCookie('connect.sid'); 
     res.json({ message: "Logged out successfully" });
   });
 });
@@ -172,6 +236,39 @@ app.patch("/cats/:id", isAuthenticated, (req, res) => {
   db.query(sql, values, (err) => {
     if (err) return res.status(500).json({ error: err });
     res.json({ message: `Cat ${req.params.id} updated` });
+  });
+});
+
+// ==========================================
+// ADOPTION ROUTES
+// ==========================================
+
+app.post("/adopt", isAuthenticated, (req, res) => {
+  const { catId } = req.body;
+  const userId = req.session.userId;
+
+  if (!catId) return res.status(400).json({ error: "Cat ID is required" });
+
+  const sql = "INSERT INTO adopted (catId, userId) VALUES (?, ?)";
+  db.query(sql, [catId, userId], (err) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json({ message: "Cat adopted successfully" });
+  });
+});
+
+app.get("/adopted", isAuthenticated, (req, res) => {
+  const userId = req.session.userId;
+  
+  // Join with cat table to get cat details
+  const sql = `
+    SELECT a.id as adoptionId, a.adoptionDate, c.* 
+    FROM adopted a 
+    JOIN cat c ON a.catId = c.id 
+    WHERE a.userId = ?
+  `;
+  db.query(sql, [userId], (err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json(results);
   });
 });
 
