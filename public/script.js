@@ -1,3 +1,8 @@
+// Check if running on localhost
+if (window.location.protocol === 'file:') {
+    alert("Please open this app using the local server URL: http://localhost:5000\nThe backend API will not work when opening the file directly.");
+}
+
 const container = document.getElementById('cats-container');
 const searchInput = document.getElementById('search');
 const tagFilter = document.getElementById('tag-filter');
@@ -58,6 +63,7 @@ async function fetchCats() {
         const response = await fetch('/cats');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         globalCats = await response.json();
+        console.log(`Successfully fetched ${globalCats.length} cats from Supabase.`);
         populateTagFilter();
         applyFilters();
     } catch (error) {
