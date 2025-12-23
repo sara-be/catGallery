@@ -219,7 +219,7 @@ document.getElementById('login-submit-btn').onclick = async () => {
             updateAuthUI(data.username);
             closeAuthModal();
         } else {
-            console.log(data.error);
+            alert(data.error || "Login failed");
         }
     } catch (err) { console.error(err); }
 };
@@ -239,7 +239,7 @@ document.getElementById('signup-submit-btn').onclick = async () => {
             console.log('Signup successful! Please log in.');
             document.getElementById('switch-to-login').click();
         } else {
-            console.log(data.error);
+            alert(data.error || "Signup failed");
         }
     } catch (err) { console.error(err); }
 };
@@ -281,7 +281,8 @@ document.getElementById('save-btn').onclick = async () => {
             body: JSON.stringify({ tag, img, description })
         });
         if (res.ok) { editModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
-        else if (res.status === 401) console.log('Session expired. Please log in.');
+        else if (res.status === 401) { alert('Session expired. Please log in.'); isAuthenticated = false; updateAuthUI(); }
+        else { alert('Failed to update cat'); }
     } catch (error) { console.error(error); }
 };
 
@@ -308,7 +309,8 @@ document.getElementById('add-save-btn').onclick = async () => {
             body: JSON.stringify({ id, tag, img, description })
         });
         if (res.ok) { addModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
-        else if (res.status === 401) console.log('Session expired. Please log in.');
+        else if (res.status === 401) { alert('Session expired. Please log in.'); isAuthenticated = false; updateAuthUI(); }
+        else { alert('Failed to add cat'); }
     } catch (error) { console.error(error); }
 };
 
@@ -326,7 +328,8 @@ document.getElementById('confirm-delete-btn').onclick = async () => {
     try {
         const res = await fetch(`/cats/${id}`, { method: 'DELETE' });
         if (res.ok) { deleteModal.classList.add('hidden'); toggleBodyScroll(false); fetchCats(); }
-        else if (res.status === 401) console.log('Session expired. Please log in.');
+        else if (res.status === 401) { alert('Session expired. Please log in.'); isAuthenticated = false; updateAuthUI(); }
+        else { alert('Failed to delete cat'); }
     } catch (error) { console.error(error); }
 };
 
@@ -380,6 +383,7 @@ viewAdoptedBtn.onclick = async () => {
         toggleBodyScroll(true);
     } catch (error) {
         console.error('Fetch adopted cats error:', error);
+        alert("Failed to load your adoptions. Please try again.");
     }
 };
 
