@@ -3,48 +3,55 @@ const bodyParser = require("body-parser");
 const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const session = require("express-session");
+const MySQLStore = require('express-mysql-session')(session);
 
 const app = express();
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
+// Database configuration
+const dbOptions = {
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "animals_db"
+};
+
+const pool = mysql.createPool(dbOptions);
+const sessionStore = new MySQLStore({
+  createDatabaseTable: true,
+  schema: {
+    tableName: 'sessions'
+  }
+}, pool);
+
+sessionStore.onReady().then(() => {
+  console.log('MySQLSessionStore ready');
+}).catch(err => {
+  console.error('MySQLSessionStore error:', err);
+});
+
 // Session configuration
 app.use(session({
+  key: 'cat_session_id',
   secret: 'cat-gallery-secret-key',
+  store: sessionStore,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: { 
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure: false // Set to true if using HTTPS
+  }
 }));
 
 // Database connection with reconnection logic
-let db;
-function handleDisconnect() {
-  db = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "animals_db"
-  });
-
-  db.connect((err) => {
-    if (err) {
-      console.error("Error connecting to MySQL:", err.message);
-      setTimeout(handleDisconnect, 2000); // Reconnect after 2 seconds
-      return;
-    }
-    console.log("MySQL connected!");
-    setupTables();
-  });
-
-  db.on('error', (err) => {
-    console.error("Database error:", err.message);
-    if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR') {
-      handleDisconnect();
-    } else {
-      throw err;
-    }
-  });
-}
+// Database connection helper (using the pool)
+const db = {
+  query: function() {
+    pool.query.apply(pool, arguments);
+  }
+};
 
 function setupTables() {
   // Create users table if not exists
@@ -59,6 +66,20 @@ function setupTables() {
   db.query(createUsersTable, (err) => {
     if (err) console.error("Error creating users table:", err);
     else console.log("Users table ready");
+  });
+
+  // Explicitly create sessions table just in case (matches express-mysql-session default)
+  const createSessionsTable = `
+    CREATE TABLE IF NOT EXISTS sessions (
+      session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+      expires INT(11) UNSIGNED NOT NULL,
+      data MEDIUMTEXT COLLATE utf8mb4_bin,
+      PRIMARY KEY (session_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  `;
+  db.query(createSessionsTable, (err) => {
+    if (err) console.error("Error ensuring sessions table:", err);
+    else console.log("Sessions table checked/ready");
   });
 
   // Create cat table if not exists
@@ -108,7 +129,7 @@ function setupTables() {
   });
 }
 
-handleDisconnect();
+// handleDisconnect();
 
 // ==========================================
 // AUTH MIDDLEWARE
@@ -169,7 +190,7 @@ app.post("/login", (req, res) => {
 app.post("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) return res.status(500).json({ error: "Logout failed" });
-    res.clearCookie('connect.sid'); 
+    res.clearCookie('cat_session_id'); // Match the session key
     res.json({ message: "Logged out successfully" });
   });
 });
@@ -276,5 +297,6 @@ app.get("/adopted", isAuthenticated, (req, res) => {
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  setupTables();
 });
 
